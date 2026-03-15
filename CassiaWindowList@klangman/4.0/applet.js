@@ -1,6 +1,6 @@
 /*
  * applet.js
- * Copyright (C) 2022-2025 Kevin Langman <klangman@gmail.com>
+ * Copyright (C) 2022-2026 Kevin Langman <klangman@gmail.com>
  * Copyright (C) 2013 Lars Mueller <cobinja@yahoo.de>
  *
  * CassiaWindowList is a fork of CobiWindowList which is found here:
@@ -350,11 +350,17 @@ var useOldMoveToWorkspace = undefined;
 Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
 
 function _(text) {
-  let locText = Gettext.dgettext(UUID, text);
-  if (locText == text) {
-    locText = window._(text);
-  }
-  return locText;
+   let locText = Gettext.dgettext(UUID, text);
+   if (locText == text) {
+      locText = window._(text);
+   }
+   return locText;
+}
+
+function printStackTrace(header) {
+   log( header );
+   var err = new Error();
+   log( "Stack:\n"+err.stack );
 }
 
 function hasFocus(metaWindow, allowTransient=true) {
@@ -881,7 +887,7 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
     this._closeBin.set_child(this._closeIcon);
     this._closeIcon.hide();
     this.hoverClone = null;
-    if (this._appButton._windows.length > 1 && this._appButton._currentWindow === metaWindow) {
+    if (this._appButton.getNumberOfWindow() > 1 && this._appButton._currentWindow === metaWindow) {
       this._box.add_style_pseudo_class('outlined');
     } else if (this._appButton.appLastFocus &&
               ((this._settings.getValue("group-windows")===GroupType.Pooled && this._settings.getValue("menu-all-windows-of-pool")) || 
@@ -1009,7 +1015,7 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
     this._closeIcon.set_opacity(128);
   }
 
-  _onButtonReleaseEvent (actor, event) {
+  _onButtonReleaseEvent(actor, event) {
     let mouseBtn = event.get_button();
     if (this._appButton._workspace.holdPopup == mouseBtn) {
        this._appButton._workspace.holdPopup = undefined;
@@ -1069,7 +1075,6 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
 
     if (this._cloneBin) {
       let animTime = 0.2; //this._settings.getValue("label-animation-time") * 0.001;
-      log( `AnimationTime: ${animTime}` );
       if (this._appButton._applet.orientation == St.Side.LEFT ||
           this._appButton._applet.orientation == St.Side.RIGHT ) {
          Tweener.addTween(this.actor, {
@@ -1200,7 +1205,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
       while (--pos && (y < children[pos].get_allocation_box().y1 || children[pos].is_visible() == false));
     }
     let dragPlaceholderPos = this._dragPlaceholderPos
-    let autoSort = this._settings.getValue("menu-sort-groups") && this._appButton._windows.length > 1;
+    let autoSort = this._settings.getValue("menu-sort-groups") && this._appButton.getNumberOfWindow() > 1;
     // If the pointer is over the placeholder then we don't need to move anything
     if (pos != dragPlaceholderPos) {
       if (this._dragPlaceholder == undefined) {
@@ -1239,7 +1244,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
     if (this._dragPlaceholder == undefined) {
       return false;
     }
-    if (source instanceof ThumbnailMenuItem && (this._appButton._windows.length <= 1 || this._settings.getValue("menu-sort-groups")==false)) {
+    if (source instanceof ThumbnailMenuItem && (this._appButton.getNumberOfWindow() <= 1 || this._settings.getValue("menu-sort-groups")==false)) {
       let newPos = (this._dragOriginalPos<this._dragPlaceholderPos) ? this._dragPlaceholderPos-1 : this._dragPlaceholderPos;
       let oldPos = this._dragOriginalPos;
       if (this._dragOriginalPos !== newPos) {
@@ -1290,7 +1295,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
   }
 
   openMenu() {
-    if (this.isOpen || this._appButton._windows.length==0 || global.settings.get_boolean("panel-edit-mode") === true) {
+    if (this.isOpen || this._appButton.getNumberOfWindow()==0 || global.settings.get_boolean("panel-edit-mode") === true) {
       return;
     }
     // Make 100% sure there are no existing items in the menu
@@ -1306,7 +1311,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
        allWindowsForPool = this._settings.getValue("menu-all-windows-of-auto");
     }
     let windows = [];
-    if (this._appButton._windows.length>1 || allWindowsForPool === false){
+    if (this._appButton.getNumberOfWindow()>1 || allWindowsForPool === false){
       windows = this._appButton._windows;
     } else {
        let btns = this._appButton._workspace._lookupAllAppButtonsForApp(this._appButton._app);
@@ -1349,9 +1354,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
     if (this._inHiding && this.numMenuItems > 1) {
       return;
     }
-    //log( "menu close called!" );
-    //var err = new Error();
-    //log( "Stack:\n"+err.stack );
+    //printStackTrace( "menu close called!" );
     let time = this._settings.getValue("fade-animation-time")*0.001;
     if (time) {
        Tweener.addTween(this.actor, {time: time, transition: 'easeOutQuad', opacity: 0, onComplete: () => {super.close(false); this.removeAll();}});
@@ -1367,7 +1370,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
   addWindow(window) {
     if (this._findMenuItemForWindow(window) == null) {
       let appBtn = this._appButton
-      if (appBtn._windows.length == 1 && appBtn._windows[0] != window) {
+      if (appBtn.getNumberOfWindow() == 1 && appBtn._windows[0] != window) {
          appBtn = this._appButton._workspace._lookupAppButtonForWindow(window);
       }
       let menuItem = new ThumbnailMenuItem(this, appBtn, window);
@@ -1469,9 +1472,9 @@ class ThumbnailMenuManager extends PopupMenu.PopupMenuManager {
       let hoverMenu = this._findMenuForActor(dragEvent);
       if (hoverMenu) {
         if (hoverMenu !== this._activeMenu) {
-          if (hoverMenu._appButton._windows.length > 1) {
+          if (hoverMenu._appButton.getNumberOfWindow() > 1) {
             this._changeMenu(hoverMenu);
-          } else if (hoverMenu._appButton._windows.length === 1) {
+          } else if (hoverMenu._appButton.getNumberOfWindow() === 1) {
             this._workspace.closeThumbnailMenu();
             Main.activateWindow(hoverMenu._appButton._currentWindow);
           }
@@ -1609,6 +1612,14 @@ class WindowListButton {
     this._updateSpacing();
   }
 
+  getNumberOfWindow() {
+     return this._windows.length;
+  }
+
+  isContextMenuOpen() {
+     return this._contextMenu.isOpen;
+  }
+
   _updateProgress() {
      // Allow the icon overlay label and the button label to add/remove any progress state
      this._updateNumber();
@@ -1621,7 +1632,7 @@ class WindowListButton {
 
   // Sort this._windows by workspace and monitor
   _sortWindows() {
-     if (this._windows.length > 1) {
+     if (this.getNumberOfWindow() > 1) {
         this._windows.sort(
            function(a, b) {
               let wsA = a.get_workspace();
@@ -1658,11 +1669,11 @@ class WindowListButton {
 
   isMinimizedAll() {
      let minimized=0;
-     for (let idx=0 ; idx < this._windows.length ; idx++ ) {
+     for (let idx=0 ; idx < this.getNumberOfWindow() ; idx++ ) {
         if (this._windows[idx].minimized)
            minimized++;
      }
-     if (minimized > 0 && minimized === this._windows.length )
+     if (minimized > 0 && minimized === this.getNumberOfWindow() )
         return true;
      return false;
   }
@@ -1678,12 +1689,12 @@ class WindowListButton {
 
   isOnOtherWorkspaceAll() {
      let other=0;
-     for (let idx=0 ; idx < this._windows.length ; idx++ ) {
+     for (let idx=0 ; idx < this.getNumberOfWindow() ; idx++ ) {
         let ws = this._windows[idx].get_workspace();
         if (ws && ws.index() != this._workspace._wsNum)
            other++;
      }
-     if (other > 0 && other === this._windows.length )
+     if (other > 0 && other === this.getNumberOfWindow() )
         return true;
      return false;
   }
@@ -1699,12 +1710,12 @@ class WindowListButton {
 
   isOnOtherMonitorAll() {
      let other=0;
-     for (let idx=0 ; idx < this._windows.length ; idx++ ) {
+     for (let idx=0 ; idx < this.getNumberOfWindow() ; idx++ ) {
         let monitor = this._windows[idx].get_monitor();
         if (monitor != -1 && monitor != this._applet.panel.monitorIndex)
            other++;
      }
-     if (other > 0 && other === this._windows.length )
+     if (other > 0 && other === this.getNumberOfWindow() )
         return true;
      return false;
   }
@@ -1799,11 +1810,11 @@ class WindowListButton {
   }
 
   addWindow(metaWindow) {
-    if (this._pinned && this._windows.length===0) {
+    if (this._pinned && this.getNumberOfWindow()===0) {
        this._minLabelSize = -1;
     }
     this._windows.push(metaWindow);
-    if (this._windows.length == 1) {
+    if (this.getNumberOfWindow() == 1) {
        this._currentWindow = metaWindow;
     }
     if (this.menu && this.menu.isOpen) {
@@ -1827,7 +1838,7 @@ class WindowListButton {
     if (this._applet._displayPinned !== DisplayPinned.Disabled)
        this.actor.add_style_pseudo_class("active");
     this._updateTooltip();
-    if (this.menu && this._windows.length == 1) {
+    if (this.menu && this.getNumberOfWindow() == 1) {
       this._workspace.menuManager.addMenu(this.menu);
     }
     this.updateIconSelection();
@@ -1924,7 +1935,8 @@ class WindowListButton {
        return;
     let enableTooltips = this._settings.getValue("show-tooltips");
     let hoverEnabled = this._settings.getValue("menu-show-on-hover");
-    if (!enableTooltips || !this._tooltip || (hoverEnabled && this._windows.length > 0)) {
+    let showHotkeys = this._settings.getValue("show-tooltip-hotkeys");
+    if (!enableTooltips || !this._tooltip || (hoverEnabled && this.getNumberOfWindow() > 0)) {
        if (this._tooltip) {
           this._tooltip.set_text("");
           this._tooltip.preventShow = false;
@@ -1932,59 +1944,61 @@ class WindowListButton {
        return;
     }
     let text = "";
-    // If this button's window is associated with a hotkey sequence, then append the hotkey sequence to the tooltip
-    let hotKeys = this._applet._keyBindings;
-    let hotKeyWindows = this._workspace._keyBindingsWindows;
-    let keySequence = this._settings.getValue("hotkey-sequence");
-    let keyNew = this._settings.getValue("hotkey-new");
-    for (let i=0 ; i < hotKeys.length ; i++) {
-       if (hotKeys[i].enabled===true && hotKeys[i].keyCombo!==null) {
-          let [seqCombo,secondCombo] = getSmartNumericHotkey(hotKeys[i].keyCombo);
-          if ((hotKeyWindows[i] === this._currentWindow ||
-             (this._pinned && keyNew && !hotKeyWindows[i] && (this._app.get_name() == hotKeys[i].description || this._app.get_id() == hotKeys[i].description)) ||
-             ((hotKeys[i].cycle===true || (seqCombo && keySequence)) && hotKeyWindows[i] && this._app === this._workspace.getAppForWindow(hotKeyWindows[i]))))
-          {
-             if ( seqCombo ) {
-                let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
-                let idx = btns.indexOf(this);
-                if (idx == 0 && btns[0]._windows.length > 1) {
-                   idx = btns[0]._windows.indexOf(this._currentWindow);
+    if (showHotkeys) {
+       // If this button's window is associated with a hotkey sequence, then append the hotkey sequence to the tooltip
+       let hotKeys = this._applet._keyBindings;
+       let hotKeyWindows = this._workspace._keyBindingsWindows;
+       let keySequence = this._settings.getValue("hotkey-sequence");
+       let keyNew = this._settings.getValue("hotkey-new");
+       for (let i=0 ; i < hotKeys.length ; i++) {
+          if (hotKeys[i].enabled===true && hotKeys[i].keyCombo!==null) {
+             let [seqCombo,secondCombo] = getSmartNumericHotkey(hotKeys[i].keyCombo);
+             if ((hotKeyWindows[i] === this._currentWindow ||
+                (this._pinned && keyNew && !hotKeyWindows[i] && (this._app.get_name() == hotKeys[i].description || this._app.get_id() == hotKeys[i].description)) ||
+                ((hotKeys[i].cycle===true || (seqCombo && keySequence)) && hotKeyWindows[i] && this._app === this._workspace.getAppForWindow(hotKeyWindows[i]))))
+             {
+                if ( seqCombo ) {
+                   let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
+                   let idx = btns.indexOf(this);
+                   if (idx == 0 && btns[0].getNumberOfWindow() > 1) {
+                      idx = btns[0]._windows.indexOf(this._currentWindow);
+                   }
+                   if (idx >= 0 && idx <= 9) {
+                      seqCombo = seqCombo.replace( /</g, "");
+                      seqCombo = seqCombo.replace( />/g, "+");
+                      text = text + "\n" + seqCombo + ((idx+1)%10);
+                   }
+                   if (secondCombo) {
+                      secondCombo = secondCombo.replace( /</g, "");
+                      secondCombo = secondCombo.replace( />/g, "+");
+                      let end = secondCombo.slice(secondCombo.lastIndexOf("+"))
+                      text = text + "\n" + secondCombo.slice(0,secondCombo.lastIndexOf("+")) + end.toUpperCase();
+                   }
+                } else {
+                   // i.e.  "<Alt><Super>e::" -> "Alt+Super+E"
+                   text = text + "\n" + getHotkeyPrettyString(hotKeys[i].keyCombo, "\n");
                 }
+             } else if (isAllButtons(hotKeys[i])) {
+                let childern = this._workspace.actor.get_children();
+                let idx = childern.indexOf(this.actor);
                 if (idx >= 0 && idx <= 9) {
-                   seqCombo = seqCombo.replace( /</g, "");
-                   seqCombo = seqCombo.replace( />/g, "+");
-                   text = text + "\n" + seqCombo + ((idx+1)%10);
+                   let keyString = hotKeys[i].keyCombo.toString();
+                   keyString = keyString.replace( /</g, "");
+                   keyString = keyString.replace( />/g, "+");
+                   text = text + "\n" + keyString.slice(0,keyString.indexOf("+")+1) + ((idx+1)%10);
                 }
-                if (secondCombo) {
-                   secondCombo = secondCombo.replace( /</g, "");
-                   secondCombo = secondCombo.replace( />/g, "+");
-                   let end = secondCombo.slice(secondCombo.lastIndexOf("+"))
-                   text = text + "\n" + secondCombo.slice(0,secondCombo.lastIndexOf("+")) + end.toUpperCase();
-                }
-             } else {
-                // i.e.  "<Alt><Super>e::" -> "Alt+Super+E"
-                text = text + "\n" + getHotkeyPrettyString(hotKeys[i].keyCombo, "\n");
-             }
-          } else if (isAllButtons(hotKeys[i])) {
-             let childern = this._workspace.actor.get_children();
-             let idx = childern.indexOf(this.actor);
-             if (idx >= 0 && idx <= 9) {
-                let keyString = hotKeys[i].keyCombo.toString();
-                keyString = keyString.replace( /</g, "");
-                keyString = keyString.replace( />/g, "+");
-                text = text + "\n" + keyString.slice(0,keyString.indexOf("+")+1) + ((idx+1)%10);
              }
           }
        }
     }
     // Add text to show the number of windows in this group
-    if (this._windows.length > 1) {
-       text = text + "\n" + this._windows.length + " " + _("windows in this group")
+    if (this.getNumberOfWindow() > 1) {
+       text = text + "\n" + this.getNumberOfWindow() + " " + _("windows in this group")
     }
     // Get the most appropriate windows tile for this button
     let title = null;
     let leftClickAction = this.getButton1Action();
-    if (this._windows.length > 0 && (this._windows.length === 1 || leftClickAction!==LeftClickGrouped.Thumbnail)) {
+    if (this.getNumberOfWindow() > 0 && (this.getNumberOfWindow() === 1 || leftClickAction!==LeftClickGrouped.Thumbnail)) {
        if (leftClickAction === LeftClickGrouped.ToggleFirst) {
           title = this._windows[0].get_title();
        } else {
@@ -2012,7 +2026,7 @@ class WindowListButton {
         let satType = this._workspace.saturationType;
         if (satType == SaturationType.All ||
            (satType == SaturationType.Minimized && this._currentWindow && this._currentWindow.minimized) ||
-           (satType == SaturationType.Idle && this._pinned && this._windows.length==0) ||
+           (satType == SaturationType.Idle && this._pinned && this.getNumberOfWindow()==0) ||
            (satType == SaturationType.OtherWorkspaces && this.isOnOtherWorkspace()) ||
            (satType == SaturationType.OtherMonitors && this.isOnOtherMonitor()) ||
            (satType == SaturationType.Focused && !this._hasFocus()) )
@@ -2110,7 +2124,7 @@ class WindowListButton {
     let setting = this._settings.getValue("display-number");
     let groupType = this._settings.getValue("group-windows");
     let text = "";
-    let number = this._windows.length;
+    let number = this.getNumberOfWindow();
     // If this button was a grouped app and now there is only one window, clear the grouped flag
     if (this._grouped === GroupingType.Auto && number < 2) {
        this._grouped = GroupingType.NotGrouped;
@@ -2193,10 +2207,9 @@ class WindowListButton {
     let pinnedSetting = this._settings.getValue("display-caption-for-pined"); // typo left for compatibility
     let hideSetting = this._settings.getValue("hide-caption-for-minimized"); // For compatibility, the option name "hide-caption-for-minimized" was maintained, but now it has more then one possible value not only for minimized windows
     let numberType = this._settings.getValue("number-type");
-    let preferredWidth = this._settings.getValue("label-width");
-    let number = this._windows.length;
+    let width = this._settings.getValue("label-width");
+    let number = this.getNumberOfWindow();
     let text = "";
-    let width = preferredWidth;
     let needsCaption = false;
     let oneCaption = false;   // Will be true if this is the last button in a pool and only one label option is enabled
     let lastButton = null;    // Will be non-null if this is a pool and only one label option is enabled
@@ -2240,10 +2253,10 @@ class WindowListButton {
        lastButton._updateLabel(); // The button with the label in this pool might need to add/remove its label
     }
     if (needsCaption === true && this._currentWindow) {
-       if (oneCaption === true && this._windows.length === 1 && poolButtons.length > 1) {
+       if (oneCaption === true && this.getNumberOfWindow() === 1 && poolButtons.length > 1) {
           let count = 0;
           for (let idx=0 ; idx < poolButtons.length ; idx++ ) {
-             if (poolButtons[idx]._windows.length === 0 ||
+             if (poolButtons[idx].getNumberOfWindow() === 0 ||
                 (hideSetting === HideLabels.Minimized && (!poolButtons[idx]._currentWindow || poolButtons[idx]._currentWindow.minimized)) ||
                 (hideSetting === HideLabels.OtherWorkspaces && poolButtons[idx].isOnOtherWorkspace()) ||
                 (hideSetting === HideLabels.OtherMonitors && poolButtons[idx].isOnOtherMonitor()))
@@ -2332,7 +2345,7 @@ class WindowListButton {
 
     // If we don't have a minimum label size, calculate it now!
     if (this._minLabelSize === -1) {
-       if (this._workspace.autoIndicatorsOff==true || this._applet.indicators==IndicatorType.None || (this._pinned && this._windows.length==0)) {
+       if (this._workspace.autoIndicatorsOff==true || this._applet.indicators==IndicatorType.None || (this._pinned && this.getNumberOfWindow()==0)) {
           this._minLabelSize = 0;
        } else {
           let minText = (this._pinned && (this._applet.indicators===IndicatorType.Pinned || this._applet.indicators===IndicatorType.Both)) ? U_PINNED+U_MIN_DOWN : U_MIN_DOWN;
@@ -2461,7 +2474,7 @@ class WindowListButton {
   }
 
   _updateFocus() {
-    for (let i = 0; i < this._windows.length; i++) {
+    for (let i = 0; i < this.getNumberOfWindow(); i++) {
       let metaWindow = this._windows[i];
       if (hasFocus(metaWindow, true) && !metaWindow.minimized) {
         this.actor.add_style_pseudo_class("focus");
@@ -2493,7 +2506,7 @@ class WindowListButton {
   _updateVisibility() {
     if ( (this._settings.getValue("group-windows")===GroupType.Launcher && !this._pinned) || this._applet.shouldAppBeHidden(this._app)) {
        this.actor.hide();
-    } else if (this._windows.length || this._pinned) {
+    } else if (this.getNumberOfWindow() || this._pinned) {
       this.actor.show();
     } else {
       //this.actor.hide();
@@ -2541,7 +2554,7 @@ class WindowListButton {
         }
      }
      let btn1Action = this.getButton1Action();
-     if (mouseBtn == 1 && ((this._windows.length > 1 && btn1Action == LeftClickGrouped.ToggleAndHold) || (this._windows.length > 0 && btn1Action == LeftClickGrouped.NewAndHold))) {
+     if (mouseBtn == 1 && ((this.getNumberOfWindow() > 1 && btn1Action == LeftClickGrouped.ToggleAndHold) || (this.getNumberOfWindow() > 0 && btn1Action == LeftClickGrouped.NewAndHold))) {
         this.holdDelay = Mainloop.timeout_add(350, Lang.bind(this, function() {
               this.openThumbnailMenu()
               this._workspace.holdPopup = mouseBtn;
@@ -2587,14 +2600,14 @@ class WindowListButton {
     if (this.menu) {
        this.removeThumbnailMenuDelay();
     }
-    if (this._contextMenu.isOpen) {
+    if (this.isContextMenuOpen()) {
       this._contextMenu.close();
     }
     // left mouse button
     if (mouseBtn == 1) {
       if (this._currentWindow) {
         let leftGroupedAction = this.getButton1Action();
-        if (this._windows.length == 1 || leftGroupedAction == LeftClickGrouped.Toggle || leftGroupedAction == LeftClickGrouped.ToggleAndHold || leftGroupedAction == LeftClickGrouped.NewAndHold) {
+        if (this.getNumberOfWindow() == 1 || leftGroupedAction == LeftClickGrouped.Toggle || leftGroupedAction == LeftClickGrouped.ToggleAndHold || leftGroupedAction == LeftClickGrouped.NewAndHold) {
           if (leftGroupedAction == LeftClickGrouped.ToggleAndHold || leftGroupedAction == LeftClickGrouped.NewAndHold) {
              if (this.holdDelay) {
                 let doIt = GLib.MainContext.default().find_source_by_id(this.holdDelay);
@@ -2605,7 +2618,6 @@ class WindowListButton {
              this.closeThumbnailMenu();
           }
           if (leftGroupedAction == LeftClickGrouped.NewAndHold) {
-             //log( "starting new app window!" );
              this._startApp();
           } else if (hasFocus(this._currentWindow, false) && !this._currentWindow.minimized) {
             this._currentWindow.minimize();
@@ -2808,7 +2820,7 @@ class WindowListButton {
               }
            } else if (wheelSetting === MouseScrollAction.CycleApp) {
               if (direction === Clutter.ScrollDirection.UP || direction === Clutter.ScrollDirection.DOWN) {
-                 if (this._windows.length === 1) {
+                 if (this.getNumberOfWindow() === 1) {
                     let groupingType = this._settings.getValue("group-windows");
                     if ((groupingType == GroupType.Pooled || groupingType == GroupType.Auto) && this._grouped != GroupingType.ForcedOn) {
                        let window = global.display.get_focus_window();
@@ -2833,11 +2845,11 @@ class WindowListButton {
                     } else {
                        Main.activateWindow(this._currentWindow);
                     }
-                 } else if (this._windows.length > 1) {
+                 } else if (this.getNumberOfWindow() > 1) {
                     if (direction === Clutter.ScrollDirection.DOWN) {
                        if (hasFocus(this._currentWindow)) {
                           let idx = this._windows.indexOf(this._currentWindow);
-                          if (idx === this._windows.length-1 )
+                          if (idx === this.getNumberOfWindow()-1 )
                              Main.activateWindow(this._windows[0]);
                           else
                              Main.activateWindow(this._windows[idx+1]);
@@ -2848,7 +2860,7 @@ class WindowListButton {
                        if (hasFocus(this._currentWindow)) {
                           let idx = this._windows.indexOf(this._currentWindow);
                           if (idx === 0 )
-                             Main.activateWindow(this._windows[this._windows.length-1]);
+                             Main.activateWindow(this._windows[this.getNumberOfWindow()-1]);
                           else
                              Main.activateWindow(this._windows[idx-1]);
                        } else {
@@ -2961,7 +2973,7 @@ class WindowListButton {
            if (btns.length > 1) {
               let button = this._workspace._groupOneApp(btns, GroupingType.ForcedOn);
               button._saveCustomAppGrouping();
-           } else if (btns.length == 1 && btns[0]._windows.length > 1) {
+           } else if (btns.length == 1 && btns[0].getNumberOfWindow() > 1) {
               this._workspace._ungroupOneApp(this, GroupingType.ForcedOff);
               this._saveCustomAppGrouping();
            }
@@ -2999,10 +3011,10 @@ class WindowListButton {
            }
            break;
         case MouseAction.LastFocused:
-           if (this._windows.length > 1){
+           if (this.getNumberOfWindow() > 1){
               this.closeThumbnailMenu();
               Main.activateWindow(this._currentWindow);
-           } else if (this._windows.length == 1) {
+           } else if (this.getNumberOfWindow() == 1) {
               let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
               for (let idx=0 ; idx < btns.length ; idx++ ) {
                  if (btns[idx].appLastFocus === true) {
@@ -3155,7 +3167,7 @@ class WindowListButton {
            }
            break;
         case MouseAction.GroupedWindow1:
-           if (this._windows.length > 0){
+           if (this.getNumberOfWindow() > 0){
               if (hasFocus(this._windows[0], false) && !this._windows[0].minimized) {
                  this._windows[0].minimize();
               } else {
@@ -3164,7 +3176,7 @@ class WindowListButton {
            }
            break;
         case MouseAction.GroupedWindow2:
-           if (this._windows.length > 1){
+           if (this.getNumberOfWindow() > 1){
               if (hasFocus(this._windows[1], false) && !this._windows[1].minimized) {
                  this._windows[1].minimize();
               } else {
@@ -3173,7 +3185,7 @@ class WindowListButton {
            }
            break;
         case MouseAction.GroupedWindow3:
-           if (this._windows.length > 2){
+           if (this.getNumberOfWindow() > 2){
               if (hasFocus(this._windows[2], false) && !this._windows[2].minimized) {
                  this._windows[2].minimize();
               } else {
@@ -3182,7 +3194,7 @@ class WindowListButton {
            }
            break;
         case MouseAction.GroupedWindow4:
-           if (this._windows.length > 3){
+           if (this.getNumberOfWindow() > 3){
               if (hasFocus(this._windows[3], false) && !this._windows[3].minimized) {
                  this._windows[3].minimize();
               } else {
@@ -3207,23 +3219,6 @@ class WindowListButton {
       }
   }
 
-  /*
-  _animateIcon(animationTime) {
-    Tweener.addTween(this._icon, {
-      opacity: 70,
-      transition: "easeOutExpo",
-      time: animationTime * 0.2,
-      onCompleteScope: this,
-      onComplete: Lang.bind(this, function() {
-        Tweener.addTween(this._icon, {
-          opacity: 255,
-          transition: "easeOutBounce",
-          time: animationTime * 0.8
-        })
-      })
-    });
-  }
-  */
 
     _animateIcon(step) {
         if (step >= 3) return;
@@ -3253,7 +3248,7 @@ class WindowListButton {
     this._app.open_new_window(-1);
     //let animationTime = this._settings.getValue("animation-time") / 1000;
     //this._animateIcon(animationTime);
-    if (this._settings.getValue("animate-icon") && (this._windows.length===0 || this._grouped === GroupingType.ForcedOn || this._grouped === GroupingType.Auto ||
+    if (this._settings.getValue("animate-icon") && (this.getNumberOfWindow()===0 || this._grouped === GroupingType.ForcedOn || this._grouped === GroupingType.Auto ||
         this._settings.getValue("group-windows")===GroupType.Launcher))
     {
        this._animateIcon(0);
@@ -3282,7 +3277,7 @@ class WindowListButton {
           menuItem.actor.add_style_pseudo_class("active");
           this.removeThumbnailMenuDelay();
        }
-    } else if (this._windows.length > 0 && this._settings.getValue("menu-show-on-hover")) {
+    } else if (this.getNumberOfWindow() > 0 && this._settings.getValue("menu-show-on-hover")) {
       this.openThumbnailMenuDelayed();
     }
 
@@ -3300,7 +3295,7 @@ class WindowListButton {
        }
        this._workspace._hoverPeekDelayId = Mainloop.timeout_add(this._workspace._hoverPeekDelay, () => {
          this._workspace._hoverPeekDelayId = destroyHoverPeekClone(this.hoverClone, this._workspace._hoverPeekDelayId, this._settings.getValue("fade-animation-time")*0.001);  // Close if one happens to exist
-         if (!this._contextMenu.isOpen && !this.menu.isOpen) {
+         if (!this.isContextMenuOpen() && !this.menu.isOpen) {
             this.hoverClone = createHoverPeekClone(this._currentWindow, this._settings.getValue("fade-animation-time")*0.001);
             this._workspace._hoverPeekDelay = 60;
          }
@@ -3341,7 +3336,7 @@ class WindowListButton {
     }
     // If we have left the panel, we might need to remove the hover peek clone and we might need to activate the window
     if (this._currentWindow && this._settings.getValue("no-click-activate") && !isCtrlOrShiftHeld() && pointerIsOffPanel) {
-       if (!this._contextMenu.isOpen && !this.menu.isOpen) {
+       if (!this.isContextMenuOpen() && !this.menu.isOpen) {
           Main.activateWindow(this._currentWindow);
        }
        this._workspace._hoverPeekDelayId = this.hoverClone = destroyHoverPeekClone(this.hoverClone, this._workspace._hoverPeekDelayId, this._settings.getValue("fade-animation-time")*0.001, true);
@@ -3359,7 +3354,7 @@ class WindowListButton {
     } else {
        this.removeThumbnailMenuDelay();
     }
-    if (!this._contextMenu.isOpen && (!this.menu || !this.menu.isOpen)) {
+    if (!this.isContextMenuOpen() && (!this.menu || !this.menu.isOpen)) {
        this.actor.set_hover(false);
     }
     /*
@@ -3383,7 +3378,7 @@ class WindowListButton {
   }
 
   _hasFocus() {
-    for (let i = 0; i < this._windows.length; i++) {
+    for (let i = 0; i < this.getNumberOfWindow(); i++) {
       if (hasFocus(this._windows[i])) {
         return true;
       }
@@ -3819,7 +3814,7 @@ class WindowListButton {
 
          // Menu options for grouping or ungrouping a button
          this._contextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-         if (this._windows.length > 1) {
+         if (this.getNumberOfWindow() > 1) {
             item = new PopupMenu.PopupMenuItem(_("Ungroup application windows"));
             item.connect("activate", Lang.bind(this, function() {
                   this._workspace._ungroupOneApp(this, GroupingType.ForcedOff);
@@ -3890,18 +3885,18 @@ class WindowListButton {
       }
 
       this._contextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-      if (this._windows.length > 1 || btns.length > 1) {
-        if (this._windows.length > 1) {
+      if (this.getNumberOfWindow() > 1 || btns.length > 1) {
+        if (this.getNumberOfWindow() > 1) {
           item = new PopupMenu.PopupIconMenuItem(_("Close others"), "application-exit", St.IconType.SYMBOLIC);
         } else {
           item = new PopupMenu.PopupIconMenuItem(_("Close other windows for application"), "application-exit", St.IconType.SYMBOLIC);
         }
         item.connect("activate", Lang.bind(this, function() {
-          if (this._windows.length > 1) {
+          if (this.getNumberOfWindow() > 1) {
              let curIdx = this._windows.indexOf(metaWindow);
              this._windows.splice(curIdx, 1);
              this._windows.push(metaWindow);
-             for (let i = this._windows.length - 2; i >= 0; i--) {
+             for (let i = this.getNumberOfWindow() - 2; i >= 0; i--) {
                this._windows[i].delete(global.get_current_time());
              }
           } else { // We have a more than one button for this application
@@ -3914,14 +3909,14 @@ class WindowListButton {
         }));
         this._contextMenu.addMenuItem(item);
 
-        if (this._windows.length > 1) {
+        if (this.getNumberOfWindow() > 1) {
           item = new PopupMenu.PopupIconMenuItem(_("Close all"), "window-close", St.IconType.SYMBOLIC);
         } else {
           item = new PopupMenu.PopupIconMenuItem(_("Close all windows for application"), "window-close", St.IconType.SYMBOLIC);
         }
         item.connect("activate", Lang.bind(this, function() {
-          if (this._windows.length > 1) {
-             for (let i = this._windows.length - 1; i >= 0; i--) {
+          if (this.getNumberOfWindow() > 1) {
+             for (let i = this.getNumberOfWindow() - 1; i >= 0; i--) {
                this._windows[i].delete(global.get_current_time());
              }
           } else { // We have more than one button for this application
@@ -3948,7 +3943,7 @@ class WindowListButton {
   }
 
   openThumbnailMenu(){
-     if (this._windows.length > 0 && !this._contextMenu.isOpen) {
+     if (this.getNumberOfWindow() > 0 && !this.isContextMenuOpen()) {
         this.removeThumbnailMenuDelay();
         this.menu.openMenu();
         this._workspace.currentMenu = this.menu;
@@ -4114,7 +4109,7 @@ class WindowListButton {
   // window so that the user can drop the item on the window
   handleDragOver(source, actor, x, y, time) {
     if (!(source.isDraggableApp || (source instanceof DND.LauncherDraggable))) {
-       if (this._windows.length > 0) {
+       if (this.getNumberOfWindow() > 0) {
           Main.activateWindow(this._windows[0]);
        }
     }
@@ -4124,7 +4119,7 @@ class WindowListButton {
   updateIconGeometry() {
      // Update the icon location so Cinnamon's minimize/restore animation can work correctly
      let curWS = global.screen.get_active_workspace_index();
-     if (this._windows.length>0 && curWS === this._workspace._wsNum && this._settings.getValue("group-windows")!==GroupType.Launcher) {
+     if (this.getNumberOfWindow()>0 && curWS === this._workspace._wsNum && this._settings.getValue("group-windows")!==GroupType.Launcher) {
         let rect = new Meta.Rectangle();
         [rect.x, rect.y] = this._iconBin.get_transformed_position();
         [rect.width, rect.height] = this._iconBin.get_transformed_size();
@@ -4160,7 +4155,7 @@ class Workspace {
     this._appSys = Cinnamon.AppSystem.get_default();
 
     this.menuManager = new ThumbnailMenuManager(this);
-    this.currentMenu = undefined; // The currently open Thumbnail menu
+    this.currentMenu = null; // The currently open Thumbnail menu
     if (this._settings.getValue("wheel-adjusts-preview-size")===ScrollWheelAction.OnGlobal)
        this.thumbnailSize = this._settings.getValue("global-preview-size");
     else
@@ -4387,7 +4382,7 @@ class Workspace {
     }
     let appButton = this._lookupAppButtonForApp(app);
     let groupingType = this._settings.getValue("group-windows")
-    if (!appButton || (groupingType != GroupType.Launcher && appButton._windows.length > 0 && appButton._grouped <= GroupingType.NotGrouped)) {
+    if (!appButton || (groupingType != GroupType.Launcher && appButton.getNumberOfWindow() > 0 && appButton._grouped <= GroupingType.NotGrouped)) {
       appButton = this._addAppButton(app, prepend);
     }
     appButton.addWindow(metaWindow);
@@ -4426,7 +4421,7 @@ class Workspace {
         if (btnToUpdateLabel){
            btnToUpdateLabel._updateLabel();
         }
-        if (appButton._windows.length === 0 && (appButton._pinned===false || this._settings.getValue("display-pinned")===false)) {
+        if (appButton.getNumberOfWindow() === 0 && (appButton._pinned===false || this._settings.getValue("display-pinned")===false)) {
            let animTime = this._settings.getValue("label-animation") ? this._settings.getValue("label-animation-time") : 0;
            animatedRemoveAppButton(this, animTime, appButton);
         } else {
@@ -4440,7 +4435,7 @@ class Workspace {
                  appButton.addWindow(window);
                  let animTime = this._settings.getValue("label-animation") ? this._settings.getValue("label-animation-time") : 0;
                  animatedRemoveAppButton(this, animTime, btns[i]);
-              } else if (appButton._windows.length === 0) {
+              } else if (appButton.getNumberOfWindow() === 0) {
                  this.menuManager.removeMenu(appButton.menu);
               }
            }
@@ -4455,7 +4450,7 @@ class Workspace {
               i = this._keyBindingsWindows.lastIndexOf(metaWindow);
            }
            // If the button is pinned and now has no windows attached, we might need to refresh the tooltip to make sure a hotkey is correctly added to the tooltip text
-           if (appButton._windows.length === 0 && appButton._pinned) {
+           if (appButton.getNumberOfWindow() === 0 && appButton._pinned) {
               appButton._updateTooltip();
            }
         }
@@ -4467,7 +4462,7 @@ class Workspace {
   removeOtherWorkspaceWindows(){
      for( let i = this._appButtons.length-1 ; i >= 0 ; i-- ) {
         let btn = this._appButtons[i];
-        for( let idx = btn._windows.length-1 ; idx >= 0 ; idx-- ) {
+        for( let idx = btn.getNumberOfWindow()-1 ; idx >= 0 ; idx-- ) {
            let window = btn._windows[idx];
            if (window.get_workspace().index() != this._wsNum) {
               this._windowRemoved(window, false);
@@ -4575,7 +4570,7 @@ class Workspace {
        let btns = this._appButtons.slice();
        for (let i = btns.length - 1; i >= 0; i--) {
          let appButton = btns[i];
-         if (appButton._pinned && appButton._windows.length == 0) {
+         if (appButton._pinned && appButton.getNumberOfWindow() == 0) {
            let animTime = this._settings.getValue("label-animation") ? this._settings.getValue("label-animation-time") : 0;
            animatedRemoveAppButton(this, animTime, appButton);
          }
@@ -4594,7 +4589,7 @@ class Workspace {
     // Remove buttons that have no running windows and are no longer pinned
     for (let i = this._appButtons.length - 1; i >= 0; i--) {
       let appButton = this._appButtons[i];
-      if ((appButton._app && appButton.getPinnedIndex() < 0) && appButton._windows.length == 0) {
+      if ((appButton._app && appButton.getPinnedIndex() < 0) && appButton.getNumberOfWindow() == 0) {
         let animTime = this._settings.getValue("label-animation") ? this._settings.getValue("label-animation-time") : 0;
         animatedRemoveAppButton(this, animTime, appButton);
       }
@@ -4680,7 +4675,7 @@ class Workspace {
     appButton._pinned = false;
     appButton._minLabelSize = -1 // Must re-calculate
     appButton.updateView();
-    if (appButton._windows.length == 0) {
+    if (appButton.getNumberOfWindow() == 0) {
       let animTime = this._settings.getValue("label-animation") ? this._settings.getValue("label-animation-time") : 0;
       animatedRemoveAppButton(this, animTime, appButton);
     }
@@ -4722,7 +4717,7 @@ class Workspace {
            if (allButtons.length > 1){
               apps.push(appButtons[i]._app);
               let windows = [];
-              allButtons.forEach((element) => {if(element._windows.length>0) {windows.push(element._windows[0]); this._windowRemoved(element._windows[0]);}} );
+              allButtons.forEach((element) => {if(element.getNumberOfWindow()>0) {windows.push(element._windows[0]); this._windowRemoved(element._windows[0]);}} );
               windows.forEach((element) => {this._windowAdded(element);} );
            }
         }
@@ -4744,7 +4739,7 @@ class Workspace {
   _ungroupAllApps(grpType) {
      let appButtons = this._appButtons.slice();
      for (let i = 0; i < appButtons.length; i++) {
-        if (appButtons[i]._windows.length > 1) {
+        if (appButtons[i].getNumberOfWindow() > 1) {
            this._ungroupOneApp(appButtons[i], grpType);
         }
      }
@@ -5133,7 +5128,7 @@ class Workspace {
            if (this._appButtons[i]._grouped === GroupingType.Auto) {
               // There is already one full width app (the group) so the expansion size will
               // be the expected appButton size * the number of windows-1
-              let consumes = (this._appButtons[i]._windows.length-1)*width;
+              let consumes = (this._appButtons[i].getNumberOfWindow()-1)*width;
               if (consumes > willConsume && consumes <= spaceAvailable) {
                  btnToUngroup = this._appButtons[i];
                  willConsume = consumes;
@@ -5329,7 +5324,7 @@ class WindowList extends Applet.Applet {
                  } else {
                     Main.activateWindow(btns[seqNum-1]._windows[0]);
                  }
-              } else if (btns && btns[0]._windows.length > seqNum-1) {
+              } else if (btns && btns[0].getNumberOfWindow() > seqNum-1) {
                  if (minimize && hasFocus(btns[0]._windows[seqNum-1])){
                     btns[0]._windows[seqNum-1].minimize();
                  } else {
@@ -5341,7 +5336,7 @@ class WindowList extends Applet.Applet {
         } else if (this._keyBindings[idx].cycle === true){
            let window = workspace._keyBindingsWindows[idx];
            let appButton = workspace._lookupAppButtonForWindow(window);
-           if (appButton && appButton._windows.length > 1) {
+           if (appButton && appButton.getNumberOfWindow() > 1) {
               // All app windows are grouped under one appButton
               if (hasFocus(appButton._currentWindow)===true) {
                  if (appButton._nextWindow===null || appButton._nextWindow===appButton._currentWindow) {
@@ -5402,10 +5397,10 @@ class WindowList extends Applet.Applet {
         let numChildern = workspace.actor.get_n_children();
         if (seqNum < numChildern) {
            let appButton = workspace.actor.get_child_at_index(seqNum)._delegate;
-           if (appButton._windows.length === 0 ) {
+           if (appButton.getNumberOfWindow() === 0 ) {
               appButton._app.open_new_window(-1);
            } else {
-              if (this._keyBindings[idx].cycle === true && appButton._windows.length > 1 && hasFocus(appButton._currentWindow)===true) {
+              if (this._keyBindings[idx].cycle === true && appButton.getNumberOfWindow() > 1 && hasFocus(appButton._currentWindow)===true) {
                  if (appButton._nextWindow===null || appButton._nextWindow===appButton._currentWindow) {
                     appButton._updateCurrentWindow(); // This will set appButton.sortedWindows
                     appButton._nextWindow = appButton.sortedWindows[1];
@@ -5674,7 +5669,7 @@ class WindowList extends Applet.Applet {
         workspace = this._workspaces[wsIdx];
         for ( let btnIdx=0 ; btnIdx < workspace._appButtons.length ; btnIdx++) {
            let btn = workspace._appButtons[btnIdx];
-           if (btn._windows.length > 0 && (btn._app.get_name() == appName || btn._app.get_id() == appName)) {
+           if (btn.getNumberOfWindow() > 0 && (btn._app.get_name() == appName || btn._app.get_id() == appName)) {
               workspace._keyBindingsWindows[keyBindingIdx] = btn._windows[0];
            }
         }
@@ -5682,7 +5677,7 @@ class WindowList extends Applet.Applet {
   }
 
   assignHotKeysToNewWindow(appButton, workspace) {
-     if (appButton._windows.length != 1 ) {
+     if (appButton.getNumberOfWindow() != 1 ) {
         return;
      }
      let keyBindings = this._settings.getValue("hotkey-bindings");
@@ -5939,7 +5934,6 @@ class WindowList extends Applet.Applet {
     for ( let i=0 ; i < this._registeredHelpKeys.length ; i++ ) {
        Main.keybindingManager.removeHotKey("CassiaWLHelp-" + i + "-" + this.instanceId);
     }
-
   }
 
   on_panel_height_changed() {
