@@ -106,7 +106,7 @@ const ICON_NAMES = {
    new_event: 'resource-calendar-insert',
    new_message: 'mail-message',
    new_private_window: 'security-high',  //'view-private',
-   new_root_window: 'dialog-password', 
+   new_root_window: 'dialog-password',
    news: 'news-subscribe',               //'news',
    new_session: 'tab-new-symbolic',
    new_window: 'window-new',
@@ -147,7 +147,7 @@ const CaptionType = {
 const GroupType = {
    Grouped: 0,       // All windows for an application should be grouped under a single windowlist button
    Pooled: 1,        // All windows for an application should be pooled side-by-side on the windowlist
-   Auto: 2,          // Application windows should automatically switch between Grouped and Pooled based on whether button caption space is constrained 
+   Auto: 2,          // Application windows should automatically switch between Grouped and Pooled based on whether button caption space is constrained
    Off: 3,           // All windows should have there own windowlist button and no ordering is maintained.
    Launcher: 4       // Behave like a panel launcher applet, only pinned buttons will be displayed
 }
@@ -877,7 +877,7 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
     if (this._appButton.getNumberOfWindow() > 1 && this._appButton._currentWindow === metaWindow) {
       this._box.add_style_pseudo_class('outlined');
     } else if (this._appButton.appLastFocus &&
-              ((this._settings.getValue("group-windows")===GroupType.Pooled && this._settings.getValue("menu-all-windows-of-pool")) || 
+              ((this._settings.getValue("group-windows")===GroupType.Pooled && this._settings.getValue("menu-all-windows-of-pool")) ||
                (this._settings.getValue("group-windows")===GroupType.Auto && this._settings.getValue("menu-all-windows-of-auto")))) {
       let btns = appButton._workspace._lookupAllAppButtonsForApp(appButton._app);
       if (btns.length > 1)
@@ -3949,7 +3949,7 @@ class WindowListButton {
          }
       }
 
-      // Menu option to Allow/Prevent windows from Automatic grouping/ungoruping 
+      // Menu option to Allow/Prevent windows from Automatic grouping/ungoruping
       if (this._settings.getValue("group-windows")===GroupType.Auto) {
          let auto = !(this._grouped == GroupingType.ForcedOff || this._grouped == GroupingType.ForcedOn);
          item = new PopupMenu.PopupSwitchMenuItem(_("Automatic grouping/ungrouping"), auto);
@@ -4926,7 +4926,7 @@ class Workspace {
       } else {
         location = y;
       }
-      // Do we need to keep application buttons together while dragging? 
+      // Do we need to keep application buttons together while dragging?
       let prevDragLocation = this.prevDragLocation;
       if (prevDragLocation && groupingType == GroupType.Pooled || groupingType == GroupType.Auto) {
         let btns = this._lookupAllAppButtonsForApp(children[pos]._delegate._app);
@@ -4942,8 +4942,8 @@ class Workspace {
       }
       // Don't move PlaceHolder if the pointer is moving towards the PlaceHolder
       if (prevDragLocation && movePlaceHolder) {
-         if ((dragPlaceholderPos < pos && prevDragLocation >= location) || 
-             (dragPlaceholderPos > pos && prevDragLocation <= location)) 
+         if ((dragPlaceholderPos < pos && prevDragLocation >= location) ||
+             (dragPlaceholderPos > pos && prevDragLocation <= location))
          {
             movePlaceHolder = false;
          }
@@ -5172,13 +5172,13 @@ class Workspace {
      }
      let settingsWidth = this._settings.getValue("label-width");
      let captionType = this._settings.getValue("display-caption-for");
-     let width = 12; // 12 is the width of a button without a caption (just the space for the minimized flag char) 
+     let width = 12; // 12 is the width of a button without a caption (just the space for the minimized flag char)
      if (captionType != DisplayCaption.One)
         width = settingsWidth;
      let btnToUngroup;
      let willConsume ;
      let spaceAvailable = this.maxSize - this.actor.get_width();
-     if (spaceAvailable < 0) { 
+     if (spaceAvailable < 0) {
         this.maxSize = this.actor.get_width()
         spaceAvailable = 0;
      }
@@ -5347,7 +5347,7 @@ class Workspace {
      this._removeDelay(this._openDelayId);
      if (this.currentMenu) {
         if (delayed) {
-           this._closeDelayId = Mainloop.timeout_add(this._settings.getValue("preview-timeout-show"), () => this.closeThumbnailMenu());
+           this._closeDelayId = Mainloop.timeout_add(this._settings.getValue("preview-timeout-hide"), () => this.closeThumbnailMenu());
         } else {
            this.currentMenu.closeMenu();
         }
