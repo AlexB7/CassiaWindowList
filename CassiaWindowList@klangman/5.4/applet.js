@@ -1403,6 +1403,19 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
     if (item) {
       item.hide();
       menuItemCount--;
+      if (menuItemCount > 0) {
+        // The menu shrinks when the item hide animation (200ms) completes, which can leave
+        // the pointer off the menu without a leave-event. Check after the animation and
+        // start the delayed close, which a menu enter-event will cancel
+        Mainloop.timeout_add(300, () => {
+          try {
+            if (this.isOpen && isPointerOffActor(this.actor)) {
+              this._appButton._workspace.closeThumbnailMenu(true);
+            }
+          } catch(e) {}
+          return false;
+        });
+      }
     }
     return menuItemCount;
   }
@@ -1891,13 +1904,10 @@ class WindowListButton {
     }
     let curMenu = this._workspace.currentMenu;
     if (curMenu && curMenu.isOpen) {
-      if (curMenu === this.menu) {
+      // Keep the menu open showing the remaining windows, only close the menu when it's empty
+      let numMenuItems = curMenu.removeWindow(metaWindow);
+      if (numMenuItems===0) {
          this._workspace.closeThumbnailMenu();
-      } else {
-         let numMenuItems = curMenu.removeWindow(metaWindow);
-         if (numMenuItems===0) {
-            this._workspace.closeThumbnailMenu();
-         }
       }
     }
     this._updateUrgentState()
@@ -2601,6 +2611,11 @@ class WindowListButton {
        this._workspace.closeThumbnailMenu();
     }
     if (this.menu) {
+       if (this._workspace.currentMenu === this.menu) {
+          // A delayed close might be pending on this soon to be destroyed menu
+          this._workspace.removeCloseThumbnailMenuDelay();
+          this._workspace.currentMenu = null;
+       }
        this._workspace.menuManager.removeMenu(this.menu);
        this.menu.destroy();
     }
