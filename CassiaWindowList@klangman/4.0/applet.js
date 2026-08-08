@@ -232,7 +232,9 @@ const MouseAction = {
   GroupedWindow3: 37,
   GroupedWindow4: 38,
   MoveHere: 39,          // Change the windows monitor and workspace to be the current monitor and workspace
-  AlwaysOnTop: 40        // Toggle the windows "Always on top" state
+  AlwaysOnTop: 40,       // Toggle the windows "Always on top" state
+  CloseAll: 41,          // Close all windows for this application
+  CloseAllOthers: 42     // Close all windows for this application except the active one
 }
 
 // Possible value for the Mouse scroll wheel action setting (used when the Thumbnail menu is closed, or the Thumbnail scroll action is disabled)
@@ -3216,6 +3218,39 @@ class WindowListButton {
               }
            }
            break;
+        case MouseAction.CloseAll: {
+           let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
+           if (this.getNumberOfWindow() > 1) {
+              for (let i = this.getNumberOfWindow() - 1; i >= 0; i--) {
+                 this._windows[i].delete(global.get_current_time());
+              }
+           } else if (btns.length > 1) {
+              for (let i = btns.length - 1; i >= 0; i--) {
+                 btns[i]._currentWindow.delete(global.get_current_time());
+              }
+           } else if (window) {
+              window.delete(global.get_current_time());
+           }
+           break;
+        }
+        case MouseAction.CloseAllOthers: {
+           if (!window) break;
+           let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
+           if (this.getNumberOfWindow() > 1) {
+              for (let i = this.getNumberOfWindow() - 1; i >= 0; i--) {
+                 if (this._windows[i] !== window) {
+                    this._windows[i].delete(global.get_current_time());
+                 }
+              }
+           } else if (btns.length > 1) {
+              for (let i = btns.length - 1; i >= 0; i--) {
+                 if (btns[i]._currentWindow !== window) {
+                    btns[i]._currentWindow.delete(global.get_current_time());
+                 }
+              }
+           }
+           break;
+        }
       }
   }
 

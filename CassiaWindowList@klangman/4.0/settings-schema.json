@@ -448,6 +448,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Thumbnail window middle button action"
@@ -490,6 +492,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Thumbnail window back button action"
@@ -532,6 +536,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Thumbnail window forward button action"
@@ -626,6 +632,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Middle button action",
@@ -675,6 +683,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Back button action",
@@ -724,6 +734,8 @@
       "Tile bottom": 31,
       "Tile bottom left": 32,
       "Untile window": 33,
+      "Close all": 41,
+      "Close all others": 42,
       "Do nothing": 12
     },
     "description": "Forward button action",
@@ -879,6 +891,8 @@
            "Tile bottom": 31,
            "Tile bottom left": 32,
            "Untile window": 33,
+           "Close all": 41,
+           "Close all others": 42,
            "Do nothing": 12
            }
         }
