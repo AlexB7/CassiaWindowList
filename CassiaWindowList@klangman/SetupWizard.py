@@ -3,10 +3,14 @@
 import sys
 import os.path
 import subprocess
+import json
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gio, GLib
+# The parent directory must also be on the path: since Cinnamon 6.6 the
+# settings widget modules import each other as "from bin import util"
+sys.path.append("/usr/share/cinnamon/cinnamon-settings")
 sys.path.append("/usr/share/cinnamon/cinnamon-settings/bin")
 from JsonSettingsWidgets import *
 from pathlib import Path
@@ -70,7 +74,14 @@ class SetupWizard:
       if (self.configFilePath.is_file() == False):
             print( f"Can't find the config file for instance {instanceId}" )
       else:
-         self.settings = JSONSettingsHandler( configFile )
+         try:
+            self.proxy = Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION, Gio.DBusProxyFlags.NONE, None,
+                                                        "org.Cinnamon", "/org/Cinnamon", "org.Cinnamon", None)
+            if not self.proxy.get_name_owner():
+               self.proxy = None
+         except GLib.Error:
+            self.proxy = None
+         self.settings = JSONSettingsHandler( configFile, notify_callback=self.notify_dbus )
          self.appBehaviour = self.settings.get_value("group-windows")
          self.launcherLeftClick = self.settings.get_value("launcher-mouse-action-btn1")
 
@@ -147,6 +158,15 @@ class SetupWizard:
          # Make sure we don't run the setup wizard ever again for this applet instance!
          self.settings.set_value("runWizard", 0)
          Gtk.main()
+
+   # Cinnamon 6.6+ no longer monitors config files for external changes, so the
+   # running applet must be told about changes via the updateSetting DBus method
+   def notify_dbus(self, handler, key, value):
+      if self.proxy:
+         try:
+            self.proxy.updateSetting('(ssss)', self.uuid, self.instanceId, key, json.dumps(value))
+         except GLib.Error:
+            pass
 
    def onDestroy(self, widget):
       Gtk.main_quit()
